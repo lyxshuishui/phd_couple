@@ -1169,7 +1169,10 @@ function sendCheer(targetPerson) {
     shared.lastCheer = `${getPersonName(appData.activePerson)} 对 ${getPersonName(targetPerson)} 说：${message}`;
     shared.cheerLog.unshift(entry);
     shared.cheerLog = shared.cheerLog.slice(0, 8);
-    getActiveProfile().cheers.unshift(entry);
+    // 存入被鼓励方的 cheers，而不是发送方
+    if (!Array.isArray(appData.profiles[targetPerson].cheers)) appData.profiles[targetPerson].cheers = [];
+    appData.profiles[targetPerson].cheers.unshift(entry);
+    appData.profiles[targetPerson].cheers = appData.profiles[targetPerson].cheers.slice(0, 8);
     saveData();
     renderInteractionPanel();
 }
@@ -1210,8 +1213,10 @@ function renderInteractionPanel() {
         })();
         return `${name}：${taskCount} 个任务，已完成 ${doneCount} 个，专注 ${focusMinutes} 分钟，打卡 ${workDays} 天，今日心情 ${lastMood}`;
     };
-    if (summary1) summary1.innerHTML = `${escapeHtml(buildSummary(person1, '水水'))}<div class="mt-2 text-xs text-dopamine-orange">最近鼓励：${escapeHtml(person1.cheers[0]?.message || '暂无')}</div>`;
-    if (summary2) summary2.innerHTML = `${escapeHtml(buildSummary(person2, '龙龙'))}<div class="mt-2 text-xs text-dopamine-purple">最近鼓励：${escapeHtml(person2.cheers[0]?.message || '暂无')}</div>`;
+    const p1LastCheer = person1.cheers?.[0];
+    const p2LastCheer = person2.cheers?.[0];
+    if (summary1) summary1.innerHTML = `${escapeHtml(buildSummary(person1, '水水'))}<div class="mt-2 text-xs text-dopamine-orange">💌 最近收到：${p1LastCheer ? escapeHtml(getPersonName(p1LastCheer.from) + ' 说：' + p1LastCheer.message) : '暂无鼓励'}</div>`;
+    if (summary2) summary2.innerHTML = `${escapeHtml(buildSummary(person2, '龙龙'))}<div class="mt-2 text-xs text-dopamine-purple">💌 最近收到：${p2LastCheer ? escapeHtml(getPersonName(p2LastCheer.from) + ' 说：' + p2LastCheer.message) : '暂无鼓励'}</div>`;
     const hint = document.getElementById('moodHint');
     if (hint) hint.title = cheerText;
 }
