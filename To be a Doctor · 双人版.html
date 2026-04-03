@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>To be a Doctor · 早日毕业</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <!-- Add Firebase products that you want to use -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dopamine: {
+                            orange: '#FF8C42',
+                            pink: '#FF6B8B',
+                            yellow: '#F9C74F',
+                            mint: '#43AA8B',
+                            sky: '#4D9DE0',
+                            purple: '#9B5DE5',
+                            coral: '#F48C6E',
+                            lime: '#A7C957',
+                        },
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'system-ui', 'Segoe UI', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'colorful': '0 10px 20px -5px rgba(0,0,0,0.08), 0 0 0 1px rgba(255,140,66,0.1)',
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(145deg, #FFF7E8 0%, #FFFAF0 100%);
+            min-height: 100vh;
+        }
+        .hover-rainbow:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.02);
+            transition: all 0.2s ease;
+        }
+        button:active { transform: scale(0.97); }
+        .mood-emoji {
+            transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            cursor: pointer;
+        }
+        .mood-emoji:hover {
+            transform: scale(1.2);
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+        }
+        .mood-active {
+            transform: scale(1.15);
+            filter: drop-shadow(0 0 6px #F9C74F);
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #FFE8D6; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #FF8C42; border-radius: 10px; }
+        .timer-pulse { animation: pulseGlow 1.2s infinite; }
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 0 0 rgba(255, 140, 66, 0.4); }
+            70% { box-shadow: 0 0 0 8px rgba(255, 140, 66, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 140, 66, 0); }
+        }
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+            display: flex; align-items: center; justify-content: center; z-index: 1000;
+            visibility: hidden; opacity: 0; transition: visibility 0.2s, opacity 0.2s;
+        }
+        .modal-overlay.active { visibility: visible; opacity: 1; }
+        .modal-content {
+            background: white; border-radius: 2rem; max-width: 90vw; width: 420px;
+            max-height: 70vh; overflow-y: auto; box-shadow: 0 25px 40px rgba(0,0,0,0.2);
+            border-top: 6px solid #FF8C42;
+        }
+        .calendar-day { transition: all 0.1s ease; }
+        .calendar-day.has-check { background-color: #F9C74F; color: #5a3e1b; font-weight: bold; border-radius: 9999px; }
+        .calendar-day.today { border: 2px solid #FF8C42; border-radius: 9999px; }
+        .work-active-glow { animation: workPulse 1.5s infinite; }
+        @keyframes workPulse {
+            0% { box-shadow: 0 0 0 0 rgba(67,170,139,0.3); }
+            70% { box-shadow: 0 0 0 6px rgba(67,170,139,0); }
+            100% { box-shadow: 0 0 0 0 rgba(67,170,139,0); }
+        }
+        .task-completed-text {
+            text-decoration: line-through;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body class="font-sans p-4 md:p-6 lg:p-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- 头部 + 心情模块 -->
+        <div class="flex flex-wrap justify-between items-center gap-4 mb-6 md:mb-8">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-dopamine-orange to-dopamine-pink bg-clip-text text-transparent">
+                    <i class="fas fa-flask text-dopamine-purple mr-2"></i> To be a Doctor
+                </h1>
+                <p class="text-amber-600/80 text-sm mt-1 flex items-center gap-2">
+                    <i class="far fa-calendar-alt text-dopamine-sky"></i>
+                    <span id="currentDate"></span>
+                    <span class="w-1 h-1 bg-amber-300 rounded-full"></span>
+                    <span>双人协作 · 快乐科研</span>
+                </p>
+            </div>
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-md px-3 py-2 flex flex-wrap items-center gap-2 border border-dopamine-yellow/40">
+                <div class="flex items-center gap-1 rounded-full bg-amber-50 p-1 border border-amber-100">
+                    <button data-person="person1" class="person-switch-btn px-3 py-1 rounded-full text-xs font-bold transition bg-dopamine-orange text-white">水水</button>
+                    <button data-person="person2" class="person-switch-btn px-3 py-1 rounded-full text-xs font-bold transition text-gray-500 hover:text-gray-700">龙龙</button>
+                </div>
+                <span class="text-sm font-bold text-dopamine-orange flex items-center gap-1"><i class="far fa-smile-wink"></i> 心情</span>
+                <div class="flex gap-2 text-2xl">
+                    <span data-mood="happy" class="mood-emoji cursor-pointer">😊</span>
+                    <span data-mood="neutral" class="mood-emoji cursor-pointer">😐</span>
+                    <span data-mood="sad" class="mood-emoji cursor-pointer">😔</span>
+                </div>
+                <button id="viewMoodHistoryBtn" class="bg-gradient-to-r from-dopamine-yellow to-dopamine-orange text-white text-xs px-2.5 py-1 rounded-full shadow-sm hover:shadow transition flex items-center gap-1">
+                    <i class="fas fa-history"></i> 历史
+                </button>
+                <div id="moodHint" class="text-xs text-dopamine-mint ml-0"></div>
+            </div>
+        </div>
+
+        <!-- 弹窗 -->
+        <div id="moodHistoryModal" class="modal-overlay"><div class="modal-content p-5"><div class="flex justify-between items-center border-b border-dopamine-yellow/30 pb-2 mb-3"><h3 class="text-lg font-bold text-dopamine-orange"><i class="far fa-smile"></i> 心情日记</h3><button class="close-modal-btn text-gray-400 hover:text-dopamine-pink text-xl">&times;</button></div><div id="moodHistoryList" class="space-y-2 max-h-[50vh] overflow-y-auto pr-1">加载中...</div></div></div>
+        <div id="taskHistoryModal" class="modal-overlay"><div class="modal-content p-5"><div class="flex justify-between items-center border-b border-dopamine-yellow/30 pb-2 mb-3"><h3 class="text-lg font-bold text-dopamine-pink"><i class="fas fa-check-circle"></i> 已完成任务 · 归档</h3><button class="close-modal-btn text-gray-400 hover:text-dopamine-pink text-xl">&times;</button></div><div id="taskHistoryList" class="space-y-2 max-h-[50vh] overflow-y-auto pr-1">加载中...</div></div></div>
+        <div id="foodHistoryModal" class="modal-overlay"><div class="modal-content p-5"><div class="flex justify-between items-center border-b border-dopamine-yellow/30 pb-2 mb-3"><h3 class="text-lg font-bold text-dopamine-mint"><i class="fas fa-utensils"></i> 饮食记录 · 历史</h3><button class="close-modal-btn text-gray-400 hover:text-dopamine-pink text-xl">&times;</button></div><div id="foodHistoryList" class="space-y-2 max-h-[50vh] overflow-y-auto pr-1">加载中...</div></div></div>
+        <div id="workCheckHistoryModal" class="modal-overlay"><div class="modal-content p-5"><div class="flex justify-between items-center border-b border-dopamine-yellow/30 pb-2 mb-3"><h3 class="text-lg font-bold text-dopamine-purple"><i class="fas fa-briefcase"></i> 工作打卡历史（含多时段）</h3><button class="close-modal-btn text-gray-400 hover:text-dopamine-pink text-xl">&times;</button></div><div id="workCheckHistoryList" class="space-y-3 max-h-[50vh] overflow-y-auto pr-1">加载中...</div></div></div>
+        <div id="mindHistoryModal" class="modal-overlay"><div class="modal-content p-5"><div class="flex justify-between items-center border-b border-dopamine-yellow/30 pb-2 mb-3"><h3 class="text-lg font-bold text-dopamine-sky"><i class="fas fa-heart"></i> 观心 · 每日回顾</h3><button class="close-modal-btn text-gray-400 hover:text-dopamine-pink text-xl">&times;</button></div><div id="mindHistoryList" class="space-y-3 max-h-[50vh] overflow-y-auto pr-1">加载中...</div></div></div>
+
+        <div class="space-y-6">
+            <!-- 双人互动 -->
+            <div class="bg-white rounded-2xl shadow-colorful p-5 md:p-6" style="border-top: 4px solid #9B5DE5;">
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-dopamine-yellow/30 pb-3 mb-4">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-heart text-dopamine-purple text-xl"></i>
+                        <h2 class="text-xl font-bold text-gray-800">双人互动</h2>
+                        <span class="text-xs bg-dopamine-purple/10 text-dopamine-purple px-2 py-0.5 rounded-full">互相打气 · 共享目标</span>
+                    </div>
+                    <div class="text-sm text-gray-500">当前在用：<span id="activePersonName" class="font-bold text-dopamine-orange">水水</span></div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div class="bg-gradient-to-br from-orange-50 to-pink-50 rounded-xl p-4">
+                        <div class="font-bold text-dopamine-orange mb-2 flex items-center gap-2"><i class="fas fa-sun"></i> 水水状态</div>
+                        <div id="person1Summary" class="text-sm text-gray-600 leading-6">暂无数据</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-sky-50 to-purple-50 rounded-xl p-4">
+                        <div class="font-bold text-dopamine-purple mb-2 flex items-center gap-2"><i class="fas fa-moon"></i> 龙龙状态</div>
+                        <div id="person2Summary" class="text-sm text-gray-600 leading-6">暂无数据</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-amber-50 to-green-50 rounded-xl p-4">
+                        <div class="font-bold text-dopamine-mint mb-3 flex items-center gap-2"><i class="fas fa-hand-holding-heart"></i> 互动操作</div>
+                        <div class="space-y-3">
+                            <div class="flex gap-2">
+                                <button id="cheerPerson1Btn" class="flex-1 bg-dopamine-orange text-white px-3 py-2 rounded-xl text-sm font-medium">给水水加油</button>
+                                <button id="cheerPerson2Btn" class="flex-1 bg-dopamine-purple text-white px-3 py-2 rounded-xl text-sm font-medium">给龙龙加油</button>
+                            </div>
+                            <input id="sharedGoalInput" type="text" placeholder="输入两人共享目标，例如：一起完成实验结果整理" class="w-full px-3 py-2 rounded-xl border border-dopamine-mint/30 bg-white/80 focus:border-dopamine-mint focus:ring-1 focus:ring-dopamine-mint">
+                            <button id="saveSharedGoalBtn" class="w-full bg-dopamine-mint text-white px-3 py-2 rounded-xl text-sm font-medium">保存共享目标</button>
+                            <div id="sharedGoalText" class="text-sm text-gray-600 bg-white/70 rounded-xl p-3 min-h-[48px]">还没有共享目标</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 今日专注卡片 -->
+            <div class="bg-white rounded-2xl shadow-colorful hover-rainbow p-5 md:p-6" style="border-top: 4px solid #FF6B8B;">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-full bg-dopamine-yellow/20 flex items-center justify-center">
+                            <i class="fas fa-hourglass-half text-dopamine-orange text-2xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800">今日专注时间</h2>
+                            <p class="text-gray-500 text-xs">自由计时 · 实时累计 · 自动同步统计看板</p>
+                        </div>
+                    </div>
+                    <div class="bg-dopamine-yellow/10 px-6 py-3 rounded-2xl text-center">
+                        <span id="todayFocusMinutes" class="text-4xl md:text-5xl font-black text-dopamine-orange">0</span>
+                        <span class="text-xl font-semibold text-dopamine-orange/80 ml-1">分钟</span>
+                    </div>
+                </div>
+                <div class="mt-4 flex flex-wrap items-center gap-2 text-sm text-gray-600 bg-amber-50/40 rounded-xl px-3 py-2">
+                    <i class="fas fa-bullseye text-dopamine-orange"></i>
+                    <span>当前专注任务：</span>
+                    <span id="activeFocusTaskName" class="font-bold text-gray-800">未选择</span>
+                    <button id="chooseFocusTaskBtn" class="ml-auto px-3 py-1 rounded-full bg-white border border-dopamine-orange/20 text-dopamine-orange hover:bg-amber-50">从待办里选择</button>
+                    <button id="clearFocusTaskBtn" class="px-3 py-1 rounded-full bg-white border border-gray-200 text-gray-500 hover:bg-gray-50">清除选择</button>
+                </div>
+                <div class="mt-5 flex flex-wrap gap-4 items-center justify-between border-t border-dopamine-yellow/20 pt-4">
+                    <div class="flex gap-3">
+                        <button id="startFocusBtn" class="bg-dopamine-orange hover:bg-dopamine-orange/85 text-white px-5 py-2.5 rounded-xl shadow-md flex items-center gap-2 transition font-medium"><i class="fas fa-play-circle"></i> 开始专注</button>
+                        <button id="stopFocusBtn" class="bg-dopamine-mint hover:bg-dopamine-mint/80 text-white px-5 py-2.5 rounded-xl shadow-md flex items-center gap-2 transition font-medium"><i class="fas fa-stop-circle"></i> 结束专注</button>
+                    </div>
+                    <div id="focusStatusBadge" class="text-sm bg-dopamine-lime/10 text-dopamine-mint px-3 py-1.5 rounded-full flex items-center gap-2">
+                        <i class="fas fa-info-circle"></i> <span id="focusActiveState">⏸️ 暂无进行中的专注</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 工作打卡 -->
+            <div class="bg-white rounded-2xl shadow-colorful p-5 md:p-6" style="border-left: 8px solid #43AA8B;">
+                <div class="flex items-center justify-between border-b border-dopamine-yellow/30 pb-2 mb-4">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-briefcase text-dopamine-purple text-xl"></i>
+                        <h2 class="text-xl font-bold text-gray-800">工作打卡</h2>
+                        <span class="text-xs bg-dopamine-yellow/30 text-dopamine-orange px-2 py-0.5 rounded-full">支持多时段 · 自动累计时长</span>
+                    </div>
+                    <button id="viewWorkCheckHistoryBtn" class="text-dopamine-purple hover:text-dopamine-orange transition text-sm bg-purple-50 px-2 py-1 rounded-full flex items-center gap-1">
+                        <i class="fas fa-history"></i> 历史
+                    </button>
+                </div>
+                <!-- 三时段累计总览 -->
+                <div class="bg-gradient-to-r from-amber-50 via-sky-50 to-purple-50 rounded-xl p-3 mb-4 flex flex-wrap items-center justify-around gap-2 text-sm font-bold">
+                    <div class="flex items-center gap-1 text-dopamine-orange"><i class="fas fa-sun"></i> 上午: <span id="morningAccum">0</span> 分钟</div>
+                    <div class="w-px h-5 bg-gray-200 hidden sm:block"></div>
+                    <div class="flex items-center gap-1 text-dopamine-sky"><i class="fas fa-cloud-sun"></i> 下午: <span id="afternoonAccum">0</span> 分钟</div>
+                    <div class="w-px h-5 bg-gray-200 hidden sm:block"></div>
+                    <div class="flex items-center gap-1 text-dopamine-purple"><i class="fas fa-moon"></i> 晚上: <span id="eveningAccum">0</span> 分钟</div>
+                    <div class="w-px h-5 bg-gray-200 hidden sm:block"></div>
+                    <div class="flex items-center gap-1 text-dopamine-pink"><i class="fas fa-calculator"></i> 今日合计: <span id="totalWorkAccum">0</span> 分钟</div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                    <!-- 上午 -->
+                    <div id="morningCard" class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-4 shadow-sm">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-dopamine-orange flex items-center gap-1"><i class="fas fa-sun"></i> 上午</h3>
+                            <span class="text-xs text-dopamine-orange/70">🌅 08:00-12:00</span>
+                        </div>
+                        <div class="flex gap-2 mb-2">
+                            <button onclick="workCheck('morning','start')" class="flex-1 bg-dopamine-orange text-white px-2 py-1.5 rounded-lg text-sm font-medium"><i class="fas fa-play"></i> 开始</button>
+                            <button onclick="workCheck('morning','end')" class="flex-1 bg-dopamine-sky text-white px-2 py-1.5 rounded-lg text-sm font-medium"><i class="fas fa-stop"></i> 结束</button>
+                        </div>
+                        <div class="text-xs bg-white rounded-lg p-2">
+                            <div id="morningStatus" class="font-mono">⏸️ 无进行中</div>
+                            <div id="morningSegCount" class="mt-0.5 text-gray-400">已记录 0 段</div>
+                        </div>
+                    </div>
+                    <!-- 下午 -->
+                    <div id="afternoonCard" class="bg-gradient-to-br from-sky-50 to-blue-50 rounded-xl p-4 shadow-sm">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-dopamine-sky flex items-center gap-1"><i class="fas fa-cloud-sun"></i> 下午</h3>
+                            <span class="text-xs text-dopamine-sky/70">☕ 12:00-18:00</span>
+                        </div>
+                        <div class="flex gap-2 mb-2">
+                            <button onclick="workCheck('afternoon','start')" class="flex-1 bg-dopamine-sky text-white px-2 py-1.5 rounded-lg text-sm font-medium"><i class="fas fa-play"></i> 开始</button>
+                            <button onclick="workCheck('afternoon','end')" class="flex-1 bg-dopamine-purple text-white px-2 py-1.5 rounded-lg text-sm font-medium"><i class="fas fa-stop"></i> 结束</button>
+                        </div>
+                        <div class="text-xs bg-white rounded-lg p-2">
+                            <div id="afternoonStatus" class="font-mono">⏸️ 无进行中</div>
+                            <div id="afternoonSegCount" class="mt-0.5 text-gray-400">已记录 0 段</div>
+                        </div>
+                    </div>
+                    <!-- 晚上 -->
+                    <div id="eveningCard" class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 shadow-sm">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-dopamine-purple flex items-center gap-1"><i class="fas fa-moon"></i> 晚上</h3>
+                            <span class="text-xs text-dopamine-purple/70">🌙 18:00-23:00</span>
+                        </div>
+                        <div class="flex gap-2 mb-2">
+                            <button onclick="workCheck('evening','start')" class="flex-1 bg-dopamine-purple text-white px-2 py-1.5 rounded-lg text-sm font-medium"><i class="fas fa-play"></i> 开始</button>
+                            <button onclick="workCheck('evening','end')" class="flex-1 bg-dopamine-pink text-white px-2 py-1.5 rounded-lg text-sm font-medium"><i class="fas fa-stop"></i> 结束</button>
+                        </div>
+                        <div class="text-xs bg-white rounded-lg p-2">
+                            <div id="eveningStatus" class="font-mono">⏸️ 无进行中</div>
+                            <div id="eveningSegCount" class="mt-0.5 text-gray-400">已记录 0 段</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 任务 + 饮食 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- 任务管理 -->
+                <div class="bg-white rounded-2xl shadow-colorful p-5 md:p-6 flex flex-col" style="border-right: 4px solid #F9C74F;">
+                    <div class="flex items-center justify-between border-b border-dopamine-yellow/30 pb-3 mb-4">
+                        <div class="flex items-center gap-2"><i class="fas fa-list-check text-dopamine-pink text-xl"></i><h2 class="text-xl font-bold text-gray-800">TODO List</h2><span class="text-xs bg-dopamine-yellow/30 text-dopamine-orange px-2 py-0.5 rounded-full">未完成自动顺延</span></div>
+                        <button id="viewTaskHistoryBtn" class="text-dopamine-pink hover:text-dopamine-orange transition text-sm bg-pink-50 px-2 py-1 rounded-full"><i class="fas fa-history"></i> 历史</button>
+                    </div>
+                    <div class="flex flex-wrap gap-3 mb-5">
+                        <div class="relative flex-1"><i class="fas fa-pen absolute left-3 top-1/2 -translate-y-1/2 text-dopamine-orange/50 text-sm"></i><input id="taskInput" type="text" placeholder="写论文、跑数据..." class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-dopamine-yellow/50 bg-amber-50/30 focus:border-dopamine-orange focus:ring-1 focus:ring-dopamine-orange"></div>
+                        <div class="relative w-full sm:w-40"><i class="fas fa-tag absolute left-3 top-1/2 -translate-y-1/2 text-dopamine-pink/50 text-sm"></i><input id="taskTagInput" type="text" placeholder="标签：科研" class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-dopamine-pink/30 bg-pink-50/20 focus:border-dopamine-pink focus:ring-1 focus:ring-dopamine-pink"></div>
+                        <button onclick="addTask()" class="bg-dopamine-pink hover:bg-dopamine-pink/85 text-white px-5 py-2.5 rounded-xl shadow-sm flex items-center gap-2"><i class="fas fa-circle-plus"></i> 添加待办</button>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mb-4 text-sm">
+                        <span class="text-gray-500 flex items-center gap-1 mr-1"><i class="fas fa-wand-magic-sparkles"></i> 快捷标签</span>
+                        <button class="preset-tag-btn px-3 py-1 rounded-full bg-orange-50 text-dopamine-orange border border-dopamine-orange/20" data-tag="读论文">读论文</button>
+                        <button class="preset-tag-btn px-3 py-1 rounded-full bg-sky-50 text-dopamine-sky border border-dopamine-sky/20" data-tag="做实验">做实验</button>
+                        <button class="preset-tag-btn px-3 py-1 rounded-full bg-pink-50 text-dopamine-pink border border-dopamine-pink/20" data-tag="写论文">写论文</button>
+                        <button class="preset-tag-btn px-3 py-1 rounded-full bg-purple-50 text-dopamine-purple border border-dopamine-purple/20" data-tag="项目">项目</button>
+                        <button class="preset-tag-btn px-3 py-1 rounded-full bg-green-50 text-dopamine-mint border border-dopamine-mint/20" data-tag="课程">课程</button>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 mb-4 text-sm">
+                        <span class="text-gray-500 flex items-center gap-1"><i class="fas fa-filter"></i> 标签筛选</span>
+                        <button class="task-filter-btn px-3 py-1 rounded-full bg-dopamine-orange text-white" data-filter-tag="all">全部</button>
+                        <button class="task-filter-btn px-3 py-1 rounded-full bg-gray-100 text-gray-600" data-filter-tag="科研">科研</button>
+                        <button class="task-filter-btn px-3 py-1 rounded-full bg-gray-100 text-gray-600" data-filter-tag="生活">生活</button>
+                        <button class="task-filter-btn px-3 py-1 rounded-full bg-gray-100 text-gray-600" data-filter-tag="紧急">紧急</button>
+                        <button class="task-filter-btn px-3 py-1 rounded-full bg-gray-100 text-gray-600" data-filter-tag="未分类">未分类</button>
+                    </div>
+                    <div class="flex-1 max-h-[340px] overflow-y-auto pr-1"><ul id="taskList" class="space-y-3"></ul><div id="emptyTaskHint" class="text-center text-gray-400 text-sm py-6 hidden">✨ 暂无任务</div></div>
+                </div>
+                <!-- 饮食日记 -->
+                <div class="bg-white rounded-2xl shadow-colorful p-5 md:p-6 flex flex-col" style="border-bottom: 4px solid #43AA8B;">
+                    <div class="flex items-center justify-between border-b border-dopamine-mint/30 pb-3 mb-4">
+                        <div class="flex items-center gap-2"><i class="fas fa-apple-alt text-dopamine-mint text-xl"></i><h2 class="text-xl font-bold text-gray-800">饮食日记</h2><span class="text-xs bg-dopamine-mint/20 text-dopamine-mint px-2 py-0.5 rounded-full">健康生活</span></div>
+                        <button id="viewFoodHistoryBtn" class="text-dopamine-mint hover:text-dopamine-orange transition text-sm bg-green-50 px-2 py-1 rounded-full"><i class="fas fa-history"></i> 历史</button>
+                    </div>
+                    <div class="flex flex-wrap gap-3 mb-5">
+                        <div class="relative flex-1"><i class="fas fa-utensils absolute left-3 top-1/2 -translate-y-1/2 text-dopamine-mint/60 text-sm"></i><input id="foodInput" type="text" placeholder="记录三餐 & 零食..." class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-dopamine-mint/40 bg-green-50/20 focus:border-dopamine-mint focus:ring-1 focus:ring-dopamine-mint"></div>
+                        <button onclick="addFood()" class="bg-dopamine-mint hover:bg-dopamine-mint/80 text-white px-5 py-2.5 rounded-xl shadow-sm flex items-center gap-2"><i class="fas fa-camera"></i> 记录</button>
+                    </div>
+                    <div class="flex-1 max-h-[340px] overflow-y-auto pr-1"><ul id="foodList" class="space-y-2"></ul><div id="emptyFoodHint" class="text-center text-gray-400 text-sm py-6 hidden">还没有饮食记录～</div></div>
+                </div>
+            </div>
+
+            <!-- 统计模块 -->
+            <div class="bg-white rounded-2xl shadow-colorful p-5 md:p-6" style="background: linear-gradient(135deg, #FFF9F0, #FFF5E6);">
+                <div class="flex items-center gap-2 border-b border-dopamine-yellow/40 pb-3 mb-5">
+                    <i class="fas fa-chart-pie text-dopamine-purple text-xl"></i>
+                    <h2 class="text-xl font-bold text-gray-800">学术洞察 · 统计看板</h2>
+                    <span class="text-xs bg-dopamine-lime/30 text-dopamine-mint px-2 py-0.5 rounded-full">实时同步</span>
+                    <span id="statsSyncIndicator" class="text-xs text-dopamine-orange/60 ml-auto"><i class="fas fa-sync-alt"></i> 已同步</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-gradient-to-br from-dopamine-orange/10 to-dopamine-yellow/10 rounded-xl p-4">
+                        <div class="flex items-center gap-2 text-dopamine-orange mb-3"><i class="fas fa-calendar-week"></i><h3 class="font-bold text-lg">本周</h3></div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between"><span>✅ 完成任务:</span><span id="weekTasks" class="font-bold">0</span></div>
+                            <div class="flex justify-between"><span>⏱️ 专注时长:</span><span id="weekFocus" class="font-bold">0 min</span></div>
+                            <div class="flex justify-between"><span>📅 打卡天数:</span><span id="weekCheckDays" class="font-bold">0 天</span></div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-dopamine-mint/10 to-dopamine-sky/10 rounded-xl p-4">
+                        <div class="flex items-center gap-2 text-dopamine-mint mb-3"><i class="fas fa-calendar-alt"></i><h3 class="font-bold text-lg">本月</h3></div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between"><span>✅ 完成任务:</span><span id="monthTasks" class="font-bold">0</span></div>
+                            <div class="flex justify-between"><span>⏱️ 专注时长:</span><span id="monthFocus" class="font-bold">0 min</span></div>
+                            <div class="flex justify-between"><span>📅 打卡天数:</span><span id="monthCheckDays" class="font-bold">0 天</span></div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-dopamine-pink/10 to-dopamine-purple/10 rounded-xl p-4">
+                        <div class="flex items-center gap-2 text-dopamine-purple mb-3"><i class="fas fa-chart-line"></i><h3 class="font-bold text-lg">本年</h3></div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between"><span>✅ 完成任务:</span><span id="yearTasks" class="font-bold">0</span></div>
+                            <div class="flex justify-between"><span>⏱️ 专注时长:</span><span id="yearFocus" class="font-bold">0 min</span></div>
+                            <div class="flex justify-between"><span>📅 打卡天数:</span><span id="yearCheckDays" class="font-bold">0 天</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 日历 -->
+            <div class="bg-white rounded-2xl shadow-colorful p-5 md:p-6">
+                <div class="flex flex-wrap items-center justify-between border-b border-dopamine-yellow/30 pb-2 mb-4">
+                    <div class="flex items-center gap-2"><i class="fas fa-calendar-alt text-dopamine-sky text-xl"></i><h2 class="text-xl font-bold text-gray-800">工作打卡日历</h2><span class="text-xs bg-dopamine-yellow/30 text-dopamine-orange px-2 py-0.5 rounded-full">有打卡的日期高亮✨</span></div>
+                    <div class="flex gap-2 items-center">
+                        <button id="prevMonthBtn" class="bg-dopamine-yellow/30 hover:bg-dopamine-yellow/50 px-2 py-1 rounded-full text-sm"><i class="fas fa-chevron-left"></i> 上月</button>
+                        <span id="calendarYearMonth" class="font-bold text-gray-700"></span>
+                        <button id="nextMonthBtn" class="bg-dopamine-yellow/30 hover:bg-dopamine-yellow/50 px-2 py-1 rounded-full text-sm">下月 <i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div id="calendarContainer" class="w-full"></div>
+            </div>
+
+            <!-- 观心模块 -->
+            <div class="bg-white rounded-2xl shadow-colorful p-5 md:p-6">
+                <div class="flex items-center justify-between border-b border-dopamine-yellow/30 pb-2 mb-4">
+                    <div class="flex items-center gap-2"><i class="fas fa-heart text-dopamine-pink text-xl"></i><h2 class="text-xl font-bold text-gray-800">观心 · 每日自省</h2><span class="text-xs bg-dopamine-pink/20 text-dopamine-pink px-2 py-0.5 rounded-full">向内探索</span></div>
+                    <button id="viewMindHistoryBtn" class="text-dopamine-sky hover:text-dopamine-orange transition text-sm bg-sky-50 px-2 py-1 rounded-full"><i class="fas fa-history"></i> 回顾</button>
+                </div>
+                <div class="space-y-4">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1"><i class="fas fa-star text-dopamine-yellow"></i> ✨ 今天你最为自己骄傲的一件事是什么？</label><textarea id="bestThing" rows="2" class="w-full p-3 rounded-xl border border-dopamine-yellow/40 bg-amber-50/20 focus:border-dopamine-pink focus:ring-1 focus:ring-dopamine-pink" placeholder="例如：完成了论文初稿、耐心解决了一个bug..."></textarea></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1"><i class="fas fa-seedling text-dopamine-mint"></i> 🌱 明天可以更好的一个小改变是什么？</label><textarea id="improveThing" rows="2" class="w-full p-3 rounded-xl border border-dopamine-mint/40 bg-green-50/20 focus:border-dopamine-pink focus:ring-1 focus:ring-dopamine-pink" placeholder="例如：早睡半小时、减少刷手机时间..."></textarea></div>
+                    <div class="flex justify-end gap-3"><button id="saveMindBtn" class="bg-dopamine-sky hover:bg-dopamine-sky/80 text-white px-5 py-2 rounded-xl shadow-sm flex items-center gap-2"><i class="fas fa-save"></i> 保存今日观心</button><button id="clearMindBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-xl">清空</button></div>
+                    <div id="mindSaveHint" class="text-xs text-dopamine-mint text-right hidden">已保存 ✓</div>
+                </div>
+            </div>
+        </div>
+        <div class="text-center text-gray-400 text-xs mt-8 pt-4 border-t border-dopamine-yellow/30 flex justify-center gap-3"><span><i class="far fa-save"></i> 全自动本地存档</span><span>·</span><span><i class="fas fa-infinity"></i> 未完成任务永不丢失</span><span>·</span><span><i class="far fa-smile"></i> 每日心情陪伴</span></div>
+    </div>
+
+<script>
+
+// ==================== Firebase 配置 ====================
+// TODO: 替换为你自己的 Firebase 配置信息
+const firebaseConfig = {
+  apiKey: "AIzaSyDVpQPZtbR6_V0vDeI0X3CSXdelHZFie6o",
+  authDomain: "tobedoctors.firebaseapp.com",
+  projectId: "tobedoctors",
+  storageBucket: "tobedoctors.appspot.com", // 注意这里应为 appspot.com
+  messagingSenderId: "1068905001145",
+  appId: "1:1068905001145:web:5f492ba2fd04e71da26b68",
+  measurementId: "G-V61XH2KEGR"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ==================== 数据结构 ====================
+let appData = {
+    activePerson: 'person1',
+    profiles: {
+        person1: { tasks: [], focusSessions: [], workRecords: {}, foods: [], moodHistory: {}, mindRecords: {} },
+        person2: { tasks: [], focusSessions: [], workRecords: {}, foods: [], moodHistory: {}, mindRecords: {} }
+    }
+};
+let activeFocusStart = null;
+let currentCalendarYear = new Date().getFullYear();
+let currentCalendarMonth = new Date().getMonth();
+let activeTaskTagFilter = 'all';
+
+// 云端同步相关
+const ROOM_ID = 'default_room'; // 可改为自定义房间号
+let unsubscribeFirestore = null;
+
+function createEmptyProfile() {
+    return { tasks: [], focusSessions: [], workRecords: {}, foods: [], moodHistory: {}, mindRecords: {}, cheers: [], activeFocusTaskId: null };
+}
+
+function ensureProfiles() {
+    if (!appData.profiles) appData.profiles = {};
+    if (!appData.profiles.person1) appData.profiles.person1 = createEmptyProfile();
+    if (!appData.profiles.person2) appData.profiles.person2 = createEmptyProfile();
+    if (!appData.activePerson) appData.activePerson = 'person1';
+}
+
+function getActiveProfile() {
+    ensureProfiles();
+    return appData.profiles[appData.activePerson] || appData.profiles.person1;
+}
+
+function getTaskById(id) {
+    return getActiveProfile().tasks.find(task => task.id === id) || null;
+}
+
+function getSharedData() {
+    if (!appData.shared) appData.shared = { goal: '', lastCheer: '', cheerLog: [] };
+    return appData.shared;
+}
+
+function syncActiveProfileAccessors() {
+    ['tasks', 'focusSessions', 'workRecords', 'foods', 'moodHistory', 'mindRecords'].forEach(key => {
+        Object.defineProperty(appData, key, {
+            configurable: true,
+            enumerable: true,
+            get() { return getActiveProfile()[key]; },
+            set(value) { getActiveProfile()[key] = value; }
+        });
+    });
+}
+
+function updatePersonSwitchUI() {
+    document.querySelectorAll('.person-switch-btn').forEach(btn => {
+        const selected = btn.getAttribute('data-person') === appData.activePerson;
+        btn.classList.toggle('bg-dopamine-orange', selected);
+        btn.classList.toggle('text-white', selected);
+        btn.classList.toggle('text-gray-500', !selected);
+        btn.classList.toggle('hover:text-gray-700', !selected);
+    });
+}
+
+function switchPerson(personKey) {
+    if (!appData.profiles[personKey]) return;
+    appData.activePerson = personKey;
+    syncActiveProfileAccessors();
+    saveData();
+    updatePersonSwitchUI();
+    renderAll();
+}
+
+function getPersonName(personKey) {
+    return personKey === 'person2' ? '龙龙' : '水水';
+}
+
+function getActivePersonName() {
+    return getPersonName(appData.activePerson);
+}
+
+// ==================== 工具函数 ====================
+function getTodayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function getNowDateTime() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+}
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+// Firestore 云端存储
+function saveData() {
+    // 只保存真正的数据字段，避免 getter 属性被序列化导致数据混乱
+    const dataToSave = {
+        activePerson: appData.activePerson,
+        profiles: appData.profiles,
+        shared: appData.shared || { goal: '', lastCheer: '', cheerLog: [] }
+    };
+    db.collection('phd_pro_v3').doc(ROOM_ID).set(dataToSave)
+        .catch(e => { console.error('保存到云端失败', e); alert('云端保存失败，请检查网络或 Firebase 配置：' + e.message); });
+}
+
+function loadData() {
+    // 监听云端数据变化，实时同步
+    if (unsubscribeFirestore) unsubscribeFirestore();
+    unsubscribeFirestore = db.collection('phd_pro_v3').doc(ROOM_ID)
+        .onSnapshot(doc => {
+            if (doc.exists) {
+                appData = doc.data();
+                ensureProfiles();
+                getSharedData();
+                syncActiveProfileAccessors();
+                ['person1', 'person2'].forEach(personKey => {
+                    const profile = appData.profiles[personKey];
+                    ['tasks', 'focusSessions', 'foods'].forEach(key => { if (!Array.isArray(profile[key])) profile[key] = []; });
+                    ['workRecords', 'moodHistory', 'mindRecords'].forEach(key => { if (!profile[key] || typeof profile[key] !== 'object') profile[key] = {}; });
+                    profile.tasks.forEach((t, idx) => { if (!t.id) t.id = Date.now() + idx; });
+                    if (!Array.isArray(profile.cheers)) profile.cheers = [];
+                    if (profile.activeFocusTaskId === undefined) profile.activeFocusTaskId = null;
+                    for (let date in profile.moodHistory) {
+                        if (typeof profile.moodHistory[date] === 'string') {
+                            profile.moodHistory[date] = [{ mood: profile.moodHistory[date], time: date + ' 00:00:00' }];
+                        }
+                    }
+                });
+                renderAll();
+            } else {
+                // 首次初始化
+                initDefault();
+                saveData();
+            }
+        }, err => {
+            console.error('云端同步失败', err);
+        });
+}
+function initDefault() {
+    appData = {
+        activePerson: 'person1',
+        profiles: {
+            person1: {
+                tasks: [
+                    { id: Date.now()+1, name: "阅读核心文献", status: "未开始", createdAt: Date.now(), completedAt: null },
+                    { id: Date.now()+2, name: "数据分析", status: "未开始", createdAt: Date.now(), completedAt: null }
+                ],
+                focusSessions: [], workRecords: {}, foods: [], moodHistory: {}, mindRecords: {}
+            },
+            person2: {
+                tasks: [
+                    { id: Date.now()+3, name: "整理实验记录", status: "未开始", createdAt: Date.now(), completedAt: null },
+                    { id: Date.now()+4, name: "复盘今日进展", status: "未开始", createdAt: Date.now(), completedAt: null }
+                ],
+                focusSessions: [], workRecords: {}, foods: [], moodHistory: {}, mindRecords: {}
+            }
+        },
+        shared: { goal: '一起稳稳推进毕业进度', lastCheer: '', cheerLog: [] }
+    };
+}
+
+// ==================== 专注模块 ====================
+function getStoredTodayFocusMinutes() {
+    const today = getTodayStr();
+    let total = 0;
+    for (let sess of appData.focusSessions) { if (sess.dateStr === today) total += sess.durationMinutes; }
+    return total;
+}
+function getRealtimeTodayFocusMinutes() {
+    let m = getStoredTodayFocusMinutes();
+    if (activeFocusStart !== null) m += (Date.now() - activeFocusStart) / 60000;
+    return m;
+}
+function updateFocusDisplay() {
+    document.getElementById("todayFocusMinutes").innerText = Math.floor(getRealtimeTodayFocusMinutes());
+}
+function startFocus() {
+    if (activeFocusStart !== null) { alert("已有专注进行中"); return; }
+    activeFocusStart = Date.now();
+    const profile = getActiveProfile();
+    profile.activeFocusTaskId = profile.activeFocusTaskId || null;
+    document.getElementById("focusActiveState").innerHTML = '<i class="fas fa-spinner fa-pulse"></i> 🔥 专注进行中...';
+    document.getElementById("focusStatusBadge").classList.add("timer-pulse");
+    updateFocusDisplay();
+    renderFocusTaskLink();
+}
+function stopFocus() {
+    if (activeFocusStart === null) { alert("没有进行中的专注"); return; }
+    const endTime = Date.now();
+    const minutes = Math.floor((endTime - activeFocusStart) / 60000);
+    if (minutes < 1) { alert("专注时长不足1分钟，未记录"); activeFocusStart = null; document.getElementById("focusActiveState").innerHTML = '⏸️ 暂无进行中的专注'; document.getElementById("focusStatusBadge").classList.remove("timer-pulse"); updateFocusDisplay(); return; }
+    const startDate = new Date(activeFocusStart);
+    const dateStr = `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-${String(startDate.getDate()).padStart(2,'0')}`;
+    appData.focusSessions.push({ startTimestamp: activeFocusStart, endTimestamp: endTime, durationMinutes: minutes, dateStr, startTimeStr: new Date(activeFocusStart).toLocaleString(), endTimeStr: new Date(endTime).toLocaleString() });
+    const profile = getActiveProfile();
+    if (profile.activeFocusTaskId) {
+        const task = getTaskById(profile.activeFocusTaskId);
+        if (task) {
+            if (!task.focusMinutes) task.focusMinutes = 0;
+            task.focusMinutes += minutes;
+            if (!Array.isArray(task.focusLogs)) task.focusLogs = [];
+            task.focusLogs.unshift({ minutes, dateStr, startTimeStr: new Date(activeFocusStart).toLocaleString(), endTimeStr: new Date(endTime).toLocaleString(), person: appData.activePerson });
+        }
+    }
+    saveData();
+    activeFocusStart = null;
+    document.getElementById("focusActiveState").innerHTML = '⏸️ 暂无进行中的专注';
+    document.getElementById("focusStatusBadge").classList.remove("timer-pulse");
+    updateFocusDisplay();
+    renderFocusTaskLink();
+    updateStatistics();
+}
+
+function setActiveFocusTask(taskId) {
+    const profile = getActiveProfile();
+    profile.activeFocusTaskId = taskId;
+    saveData();
+    renderFocusTaskLink();
+    renderTasks();
+}
+
+function clearActiveFocusTask() {
+    const profile = getActiveProfile();
+    profile.activeFocusTaskId = null;
+    saveData();
+    renderFocusTaskLink();
+    renderTasks();
+}
+
+function renderFocusTaskLink() {
+    const profile = getActiveProfile();
+    const task = profile.activeFocusTaskId ? getTaskById(profile.activeFocusTaskId) : null;
+    const nameEl = document.getElementById('activeFocusTaskName');
+    if (nameEl) nameEl.innerText = task ? `${task.name} #${(task.tag || '未分类').trim()}` : '未选择';
+}
+
+// ==================== 工作打卡模块 ====================
+function ensureWorkRecordForToday() {
+    const today = getTodayStr();
+    if (!appData.workRecords[today]) appData.workRecords[today] = { morning: [], afternoon: [], evening: [] };
+    return appData.workRecords[today];
+}
+function workCheck(period, action) {
+    const dayRecord = ensureWorkRecordForToday();
+    const periods = dayRecord[period];
+    const periodNames = { morning: '上午', afternoon: '下午', evening: '晚上' };
+    if (action === 'start') {
+        if (periods.find(s => s.end === null)) { alert(`已有进行中的${periodNames[period]}工作段，请先结束再开始新的`); return; }
+        periods.push({ start: Date.now(), end: null, startTimeStr: getNowDateTime(), endTimeStr: null, duration: 0 });
+        saveData();
+    } else if (action === 'end') {
+        const idx = periods.findIndex(s => s.end === null);
+        if (idx === -1) { alert(`没有进行中的${periodNames[period]}工作段`); return; }
+        const endTime = Date.now();
+        periods[idx].end = endTime;
+        periods[idx].endTimeStr = getNowDateTime();
+        periods[idx].duration = Math.floor((endTime - periods[idx].start) / 60000);
+        saveData();
+    }
+    renderWorkCheckDisplay();
+    renderCalendar();
+    updateStatistics();
+}
+function computePeriodTotalMinutes(periodRecords) {
+    let total = 0;
+    if (!periodRecords) return 0;
+    for (let seg of periodRecords) {
+        if (seg.end !== null) total += (seg.duration || 0);
+        else total += Math.floor((Date.now() - seg.start) / 60000);
+    }
+    return total;
+}
+// 合并所有 profile 的 workRecords
+function getAllProfilesWorkRecords() {
+    const allRecords = {};
+    Object.values(appData.profiles || {}).forEach(profile => {
+        const wr = profile.workRecords || {};
+        Object.entries(wr).forEach(([date, day]) => {
+            if (!allRecords[date]) allRecords[date] = { morning: [], afternoon: [], evening: [] };
+            ['morning', 'afternoon', 'evening'].forEach(period => {
+                allRecords[date][period] = allRecords[date][period].concat(day[period] || []);
+            });
+        });
+    });
+    return allRecords;
+}
+
+function renderWorkCheckDisplay() {
+    const today = getTodayStr();
+    const allRecords = getAllProfilesWorkRecords();
+    const records = allRecords[today] || { morning: [], afternoon: [], evening: [] };
+    const allPeriods = ['morning', 'afternoon', 'evening'];
+    let grandTotal = 0;
+
+    allPeriods.forEach(p => {
+        const segs = records[p] || [];
+        const active = segs.find(s => s.end === null);
+        const card = document.getElementById(`${p}Card`);
+        const statusDiv = document.getElementById(`${p}Status`);
+
+        // 状态显示
+        if (statusDiv) {
+            if (active) {
+                const elapsed = Math.floor((Date.now() - active.start) / 60000);
+                statusDiv.innerHTML = `<span class=\"text-green-600\">⏵ 进行中 · 已持续 ${elapsed} 分钟</span>`;
+            } else {
+                statusDiv.innerText = '⏸️ 无进行中';
+            }
+        }
+        // 卡片动效
+        if (card) {
+            if (active) card.classList.add('work-active-glow');
+            else card.classList.remove('work-active-glow');
+        }
+
+        const totalMin = computePeriodTotalMinutes(segs);
+        grandTotal += totalMin;
+
+        // 段数显示
+        const segCountDiv = document.getElementById(`${p}SegCount`);
+        if (segCountDiv) {
+            const done = segs.filter(s => s.end !== null).length;
+            const running = segs.filter(s => s.end === null).length;
+            let text = `已完成 ${done} 段`;
+            if (running > 0) text += ` · 进行中 ${running} 段`;
+            segCountDiv.innerText = text;
+        }
+
+        // 顶部总览栏
+        const accumSpan = document.getElementById(`${p}Accum`);
+        if (accumSpan) accumSpan.innerText = totalMin;
+    });
+
+    const totalAccum = document.getElementById('totalWorkAccum');
+    if (totalAccum) totalAccum.innerText = grandTotal;
+}
+function showWorkCheckHistory() {
+    const container = document.getElementById("workCheckHistoryList");
+    const entries = Object.entries(appData.workRecords);
+    if (entries.length === 0) { container.innerHTML = '<div class="text-center text-gray-400 py-4">暂无工作打卡记录</div>'; }
+    else {
+        entries.sort((a,b) => b[0].localeCompare(a[0]));
+        let html = '';
+        for (let [date, day] of entries) {
+            let dayTotal = 0;
+            html += `<div class="bg-gradient-to-r from-purple-50 to-white p-3 rounded-xl border-l-4 border-dopamine-purple mb-2"><div class="font-bold text-gray-700 text-base">📅 ${date}</div>`;
+            for (let period of ['morning','afternoon','evening']) {
+                const segs = day[period] || [];
+                if (segs.length === 0) continue;
+                const periodName = {morning:'🌅 上午',afternoon:'☕ 下午',evening:'🌙 晚上'}[period];
+                const periodTotal = segs.reduce((s, seg) => s + (seg.duration || 0), 0);
+                dayTotal += periodTotal;
+                html += `<div class="mt-2 text-sm font-semibold text-dopamine-orange">${periodName} · 累计 ${periodTotal} 分钟</div>`;
+                segs.forEach((seg, idx) => {
+                    const dur = seg.end !== null ? `${seg.duration||0} 分钟` : '<span class="text-green-500">进行中</span>';
+                    html += `<div class="text-xs text-gray-600 ml-4 flex items-center gap-1"><span class="text-gray-400">段${idx+1}:</span><span class="font-mono">${seg.startTimeStr||'?'}</span><span>→</span><span class="font-mono">${seg.endTimeStr||'未结束'}</span><span class="font-bold ml-1">(${dur})</span></div>`;
+                });
+            }
+            html += `<div class="mt-2 text-sm font-bold text-dopamine-purple border-t border-purple-100 pt-1">📊 当日总计: ${dayTotal} 分钟</div></div>`;
+        }
+        container.innerHTML = html;
+    }
+    document.getElementById("workCheckHistoryModal").classList.add("active");
+}
+
+// ==================== 任务管理（已完成划线显示） ====================
+function addTask() {
+    const input = document.getElementById("taskInput");
+    const tagInput = document.getElementById("taskTagInput");
+    const name = input.value.trim();
+    const tag = tagInput.value.trim();
+    if (!name) return;
+    getActiveProfile().tasks.push({ id: Date.now(), name, tag, status: "未开始", pinned: false, todayOnly: false, createdAt: Date.now(), completedAt: null });
+    saveData(); input.value = ""; tagInput.value = ""; renderTasks(); updateStatistics();
+}
+function changeTaskStatus(id) {
+    const task = getActiveProfile().tasks.find(t => t.id === id);
+    if (!task) return;
+    const statuses = ["未开始", "进行中", "已完成"];
+    task.status = statuses[(statuses.indexOf(task.status) + 1) % statuses.length];
+    task.completedAt = task.status === "已完成" ? Date.now() : null;
+    saveData(); renderTasks(); updateStatistics();
+}
+function deleteTask(id) {
+    if (!confirm("确定删除此任务？")) return;
+    const profile = getActiveProfile();
+    profile.tasks = profile.tasks.filter(t => t.id !== id);
+    saveData(); renderTasks(); updateStatistics();
+}
+function toggleTaskPinned(id) {
+    const task = getActiveProfile().tasks.find(t => t.id === id);
+    if (!task) return;
+    task.pinned = !task.pinned;
+    saveData(); renderTasks();
+}
+function toggleTaskTodayOnly(id) {
+    const task = getActiveProfile().tasks.find(t => t.id === id);
+    if (!task) return;
+    task.todayOnly = !task.todayOnly;
+    saveData(); renderTasks();
+}
+function renderTasks() {
+    const container = document.getElementById("taskList");
+    const emptyHint = document.getElementById("emptyTaskHint");
+
+    const tasks = getActiveProfile().tasks;
+    const filteredByTag = activeTaskTagFilter === 'all'
+        ? tasks
+        : tasks.filter(task => ((task.tag || '未分类').trim() || '未分类') === activeTaskTagFilter);
+
+    if (filteredByTag.length === 0) {
+        container.innerHTML = "";
+        emptyHint?.classList.remove("hidden");
+        if (emptyHint) emptyHint.innerText = activeTaskTagFilter === 'all' ? '✨ 暂无任务' : `✨ 当前标签「${activeTaskTagFilter}」下没有任务`;
+        return;
+    }
+    emptyHint?.classList.add("hidden");
+    container.innerHTML = "";
+
+    // 排序：未完成在前，已完成在后
+    const sorted = [...filteredByTag].sort((a, b) => {
+        if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+        const order = { "进行中": 0, "未开始": 1, "已完成": 2 };
+        return (order[a.status] ?? 1) - (order[b.status] ?? 1);
+    });
+
+    const statusConfig = {
+        "未开始": {
+            badgeColor: "bg-gray-100 text-gray-500 border border-gray-200",
+            icon: "far fa-circle",
+            border: "border-gray-300",
+            bgGrad: "from-gray-50/30 to-white"
+        },
+        "进行中": {
+            badgeColor: "bg-dopamine-yellow/20 text-dopamine-orange border border-dopamine-yellow/40",
+            icon: "fas fa-spinner fa-pulse",
+            border: "border-dopamine-yellow",
+            bgGrad: "from-amber-50/40 to-white"
+        },
+        "已完成": {
+            badgeColor: "bg-dopamine-mint/15 text-dopamine-mint border border-dopamine-mint/30",
+            icon: "fas fa-check-circle",
+            border: "border-dopamine-mint/50",
+            bgGrad: "from-green-50/20 to-gray-50/30"
+        }
+    };
+
+    sorted.forEach(task => {
+        const cfg = statusConfig[task.status] || statusConfig["未开始"];
+        const isCompleted = task.status === "已完成";
+        const tagText = (task.tag || "未分类").trim();
+        const isPinned = !!task.pinned;
+        const isTodayOnly = !!task.todayOnly;
+        const profile = getActiveProfile();
+        const isFocusTarget = profile.activeFocusTaskId === task.id;
+        const li = document.createElement("li");
+        li.className = `flex justify-between items-center p-3 rounded-xl border-l-4 ${cfg.border} shadow-sm bg-gradient-to-r ${cfg.bgGrad} ${isCompleted ? 'opacity-70' : ''} ${isPinned ? 'ring-2 ring-dopamine-orange/30' : ''} ${isFocusTarget ? 'ring-2 ring-dopamine-mint/40' : ''}`;
+        li.innerHTML = `
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+                <button onclick="changeTaskStatus(${task.id})" class="w-8 h-8 rounded-full ${cfg.badgeColor} hover:opacity-80 flex items-center justify-center shrink-0 transition" title="点击切换状态">
+                    <i class="${isCompleted ? 'fas fa-check' : 'far fa-circle'}"></i>
+                </button>
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-sm font-medium truncate ${isCompleted ? 'task-completed-text' : 'text-gray-800'}">${escapeHtml(task.name)}</span>
+                        <span class="text-[11px] px-2 py-0.5 rounded-full bg-dopamine-yellow/20 text-dopamine-orange border border-dopamine-yellow/30 shrink-0">#${escapeHtml(tagText)}</span>
+                        <span class="text-[11px] px-2 py-0.5 rounded-full ${cfg.badgeColor} shrink-0">${task.status}</span>
+                        ${isPinned ? '<span class="text-[11px] px-2 py-0.5 rounded-full bg-dopamine-orange text-white shrink-0">置顶</span>' : ''}
+                        ${isTodayOnly ? '<span class="text-[11px] px-2 py-0.5 rounded-full bg-dopamine-pink/15 text-dopamine-pink shrink-0">今日必做</span>' : ''}
+                        ${task.focusMinutes ? `<span class="text-[11px] px-2 py-0.5 rounded-full bg-dopamine-mint/15 text-dopamine-mint shrink-0">已专注 ${task.focusMinutes} 分钟</span>` : ''}
+                        ${isFocusTarget ? '<span class="text-[11px] px-2 py-0.5 rounded-full bg-dopamine-mint text-white shrink-0">当前专注</span>' : ''}
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-1 shrink-0 ml-2">
+                <button onclick="setActiveFocusTask(${task.id})" title="设为当前专注任务" class="text-dopamine-mint hover:text-dopamine-orange w-7 h-7 flex items-center justify-center rounded-full bg-white shadow-sm transition"><i class="fas fa-bullseye text-xs"></i></button>
+                <button onclick="toggleTaskPinned(${task.id})" title="置顶/取消置顶" class="text-dopamine-orange hover:text-dopamine-pink w-7 h-7 flex items-center justify-center rounded-full bg-white shadow-sm transition"><i class="${isPinned ? 'fas fa-thumbtack' : 'far fa-thumbtack'} text-xs"></i></button>
+                <button onclick="toggleTaskTodayOnly(${task.id})" title="今日必做" class="text-dopamine-pink hover:text-dopamine-orange w-7 h-7 flex items-center justify-center rounded-full bg-white shadow-sm transition"><i class="${isTodayOnly ? 'fas fa-bolt' : 'far fa-bolt'} text-xs"></i></button>
+                <button onclick="changeTaskStatus(${task.id})" title="切换状态" class="text-dopamine-mint hover:text-dopamine-orange w-7 h-7 flex items-center justify-center rounded-full bg-white shadow-sm transition"><i class="fas fa-exchange-alt text-xs"></i></button>
+                <button onclick="deleteTask(${task.id})" title="删除" class="text-gray-400 hover:text-dopamine-pink w-7 h-7 flex items-center justify-center rounded-full bg-white shadow-sm transition"><i class="fas fa-times text-xs"></i></button>
+            </div>
+        `;
+        container.appendChild(li);
+    });
+    renderFocusTaskLink();
+}
+function showTaskHistory() {
+    const container = document.getElementById("taskHistoryList");
+    const completed = getActiveProfile().tasks.filter(t => t.status === "已完成");
+    if (completed.length === 0) { container.innerHTML = '<div class="text-center text-gray-400 py-4">暂无已完成任务</div>'; }
+    else {
+        const sorted = [...completed].sort((a,b) => (b.completedAt||0) - (a.completedAt||0));
+        let html = '';
+        sorted.forEach(t => {
+            const d = t.completedAt ? new Date(t.completedAt).toLocaleString() : '未知';
+            html += `<div class="bg-gradient-to-r from-pink-50 to-white p-3 rounded-xl border-l-4 border-dopamine-pink"><div class="flex justify-between items-center gap-2"><span class="text-sm font-medium min-w-0 truncate">✅ ${escapeHtml(t.name)}</span><span class="text-[11px] px-2 py-0.5 rounded-full bg-dopamine-yellow/20 text-dopamine-orange border border-dopamine-yellow/30 shrink-0">#${escapeHtml((t.tag || '未分类').trim())}</span><span class="text-xs text-gray-400 shrink-0">${d}</span></div></div>`;
+        });
+        container.innerHTML = html;
+    }
+    document.getElementById("taskHistoryModal").classList.add("active");
+}
+
+// ==================== 饮食日记 ====================
+function addFood() {
+    const f = document.getElementById("foodInput").value.trim();
+    if (!f) return;
+    appData.foods.push({ text: f, fullDateTime: getNowDateTime(), dateStr: getTodayStr() });
+    saveData(); document.getElementById("foodInput").value = ""; renderFoods();
+}
+function deleteFood(index) {
+    if (confirm("删除这条饮食记录？")) { appData.foods.splice(index,1); saveData(); renderFoods(); }
+}
+function renderFoods() {
+    const container = document.getElementById("foodList");
+    const emptyHint = document.getElementById("emptyFoodHint");
+    if (!appData.foods.length) { container.innerHTML = ""; emptyHint?.classList.remove("hidden"); return; }
+    emptyHint?.classList.add("hidden");
+    container.innerHTML = "";
+    const today = getTodayStr();
+    const todayFoods = appData.foods.map((item, idx) => ({...item, originalIndex: idx})).filter(item => (item.dateStr || item.fullDateTime?.substring(0,10)) === today);
+    if (todayFoods.length === 0) { container.innerHTML = '<div class="text-center text-gray-400 text-sm py-3">今日暂无记录，点击"历史"查看所有</div>'; return; }
+    todayFoods.forEach(item => {
+        const li = document.createElement("li");
+        li.className = "flex justify-between items-center bg-gradient-to-r from-green-50/40 to-white p-3 rounded-xl border-l-4 border-dopamine-mint shadow-sm";
+        li.innerHTML = `<div class="min-w-0 flex-1"><span class="text-sm font-medium">🍽️ ${escapeHtml(item.text)}</span><span class="text-xs text-gray-400 ml-2">${item.fullDateTime}</span></div><button class="text-gray-400 hover:text-dopamine-pink bg-white rounded-full w-7 h-7 flex items-center justify-center shadow-sm shrink-0 ml-2" onclick="deleteFood(${item.originalIndex})"><i class="fas fa-times"></i></button>`;
+        container.appendChild(li);
+    });
+}
+function showFoodHistory() {
+    const container = document.getElementById("foodHistoryList");
+    if (appData.foods.length === 0) { container.innerHTML = '<div class="text-center text-gray-400 py-4">暂无饮食记录</div>'; }
+    else {
+        const reversed = [...appData.foods].reverse();
+        let html = '', currentDate = '';
+        reversed.forEach(item => {
+            const d = item.dateStr || item.fullDateTime?.substring(0,10) || '未知';
+            if (d !== currentDate) { currentDate = d; html += `<div class="font-bold text-gray-600 text-sm mt-2">📅 ${currentDate}</div>`; }
+            html += `<div class="bg-gradient-to-r from-green-50 to-white p-2.5 rounded-xl border-l-4 border-dopamine-mint"><span class="text-sm font-medium">🍽️ ${escapeHtml(item.text)}</span><span class="text-xs text-gray-400 ml-2">${item.fullDateTime}</span></div>`;
+        });
+        container.innerHTML = html;
+    }
+    document.getElementById("foodHistoryModal").classList.add("active");
+}
+
+// ==================== 心情模块 ====================
+function setMood(mood) {
+    const today = getTodayStr();
+    if (!appData.moodHistory[today]) appData.moodHistory[today] = [];
+    if (!Array.isArray(appData.moodHistory[today])) appData.moodHistory[today] = [{ mood: appData.moodHistory[today], time: today + ' 00:00:00' }];
+    appData.moodHistory[today].push({ mood, time: getNowDateTime() });
+    saveData(); updateMoodUI();
+}
+function updateMoodUI() {
+    const today = getTodayStr();
+    let todayMoods = appData.moodHistory[today] || [];
+    if (!Array.isArray(todayMoods)) todayMoods = [{ mood: todayMoods }];
+    document.querySelectorAll('.mood-emoji').forEach(el => el.classList.remove('mood-active'));
+    const hintDiv = document.getElementById("moodHint");
+    if (todayMoods.length > 0) {
+        const lastMood = todayMoods[todayMoods.length - 1].mood;
+        const el = document.querySelector(`[data-mood="${lastMood}"]`);
+        if (el) el.classList.add('mood-active');
+        hintDiv.innerText = { happy: "😊 开心！继续保持", neutral: "😐 平静也是一种力量", sad: "😔 辛苦了，明天会更好" }[lastMood] || '';
+    } else { hintDiv.innerText = ''; }
+}
+function showMoodHistory() {
+    const container = document.getElementById("moodHistoryList");
+    const entries = Object.entries(appData.moodHistory);
+    if (entries.length === 0) { container.innerHTML = '<div class="text-center text-gray-400 py-4">暂无心情记录</div>'; }
+    else {
+        entries.sort((a,b) => b[0].localeCompare(a[0]));
+        const moodEmojis = { happy: '😊 开心', neutral: '😐 平静', sad: '😔 低落' };
+        let html = '';
+        entries.forEach(([date, moods]) => {
+            html += `<div class="bg-gradient-to-r from-yellow-50 to-white p-3 rounded-xl border-l-4 border-dopamine-yellow"><div class="font-bold text-gray-700">📅 ${date}</div>`;
+            (Array.isArray(moods) ? moods : [{mood: moods, time:''}]).forEach(m => {
+                html += `<div class="text-sm ml-3 mt-0.5">${moodEmojis[m.mood]||'❓ '+m.mood} <span class="text-xs text-gray-400 ml-1">${m.time||''}</span></div>`;
+            });
+            html += `</div>`;
+        });
+        container.innerHTML = html;
+    }
+    document.getElementById("moodHistoryModal").classList.add("active");
+}
+
+// ==================== 统计模块（实时同步） ====================
+function updateStatistics() {
+    const now = new Date();
+    const weekStart = new Date(now);
+    const dow = weekStart.getDay() === 0 ? 6 : weekStart.getDay() - 1;
+    weekStart.setDate(weekStart.getDate() - dow);
+    weekStart.setHours(0,0,0,0);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    function dateStrToDate(s) { const p=s.split('-'); return new Date(+p[0], +p[1]-1, +p[2]); }
+    function inRange(s, start) { const d=dateStrToDate(s); d.setHours(0,0,0,0); return d>=start && d<=now; }
+
+    const profile = getActiveProfile();
+    let wT=0,mT=0,yT=0;
+    profile.tasks.forEach(t => {
+        if (t.status==="已完成" && t.completedAt) {
+            const cd = new Date(t.completedAt);
+            if (cd>=weekStart) wT++;
+            if (cd>=monthStart) mT++;
+            if (cd>=yearStart) yT++;
+        }
+    });
+
+    let wF=0,mF=0,yF=0;
+    profile.focusSessions.forEach(s => {
+        if (inRange(s.dateStr, weekStart)) wF += s.durationMinutes;
+        if (inRange(s.dateStr, monthStart)) mF += s.durationMinutes;
+        if (inRange(s.dateStr, yearStart)) yF += s.durationMinutes;
+    });
+    if (activeFocusStart !== null) {
+        const am = Math.floor((Date.now()-activeFocusStart)/60000);
+        wF+=am; mF+=am; yF+=am;
+    }
+
+    let wD=0,mD=0,yD=0;
+    Object.keys(profile.workRecords).forEach(ds => {
+        const day = profile.workRecords[ds];
+        if (!['morning','afternoon','evening'].some(p => (day[p]||[]).length>0)) return;
+        if (inRange(ds, weekStart)) wD++;
+        if (inRange(ds, monthStart)) mD++;
+        if (inRange(ds, yearStart)) yD++;
+    });
+
+    document.getElementById("weekTasks").innerText = wT;
+    document.getElementById("weekFocus").innerText = wF + " min";
+    document.getElementById("weekCheckDays").innerText = wD + " 天";
+    document.getElementById("monthTasks").innerText = mT;
+    document.getElementById("monthFocus").innerText = mF + " min";
+    document.getElementById("monthCheckDays").innerText = mD + " 天";
+    document.getElementById("yearTasks").innerText = yT;
+    document.getElementById("yearFocus").innerText = yF + " min";
+    document.getElementById("yearCheckDays").innerText = yD + " 天";
+
+    const ind = document.getElementById("statsSyncIndicator");
+    if (ind) ind.innerHTML = `<i class="fas fa-sync-alt ${activeFocusStart?'fa-spin':''}"></i> ${activeFocusStart?'实时同步中':'已同步'}`;
+}
+
+// ==================== 日历 ====================
+function renderCalendar() {
+    const year = currentCalendarYear, month = currentCalendarMonth;
+    const allRecords = getAllProfilesWorkRecords();
+    const startWeekday = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+    const weekdays = ['日','一','二','三','四','五','六'];
+    let html = `<div class="grid grid-cols-7 gap-1 text-center text-sm text-gray-500 mb-1">${weekdays.map(d=>`<div class=\"font-medium\">${d}</div>`).join('')}</div><div class="grid grid-cols-7 gap-1">`;
+    for (let i=0; i<startWeekday; i++) html += `<div class=\"h-10 w-full\"></div>`;
+    for (let d=1; d<=daysInMonth; d++) {
+        const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dd = allRecords[ds];
+        const hasCheck = dd && ['morning','afternoon','evening'].some(p=>(dd[p]||[]).length>0);
+        const isToday = (d===new Date().getDate() && month===new Date().getMonth() && year===new Date().getFullYear());
+        let cls = "calendar-day h-10 w-full flex items-center justify-center text-sm font-medium cursor-default ";
+        if (hasCheck) cls += "has-check "; if (isToday) cls += "today ";
+        html += `<div class=\"${cls}\" title=\"${ds}\">${d}</div>`;
+    }
+    html += `</div>`;
+    document.getElementById("calendarContainer").innerHTML = html;
+    document.getElementById("calendarYearMonth").innerText = `${year}年 ${month+1}月`;
+}
+function prevMonth() { if (currentCalendarMonth===0){currentCalendarYear--;currentCalendarMonth=11;} else currentCalendarMonth--; renderCalendar(); }
+function nextMonth() { if (currentCalendarMonth===11){currentCalendarYear++;currentCalendarMonth=0;} else currentCalendarMonth++; renderCalendar(); }
+
+// ==================== 观心 ====================
+function loadMindForToday() {
+    const r = appData.mindRecords[getTodayStr()] || { best:'', improve:'' };
+    document.getElementById("bestThing").value = r.best||'';
+    document.getElementById("improveThing").value = r.improve||'';
+}
+function saveMind() {
+    const best = document.getElementById("bestThing").value.trim();
+    const improve = document.getElementById("improveThing").value.trim();
+    if (!best && !improve) { alert("请至少填写一项内容"); return; }
+    appData.mindRecords[getTodayStr()] = { best, improve, savedAt: getNowDateTime() };
+    saveData();
+    const h = document.getElementById("mindSaveHint"); h.classList.remove("hidden"); setTimeout(()=>h.classList.add("hidden"),2000);
+}
+function showMindHistory() {
+    const container = document.getElementById("mindHistoryList");
+    const entries = Object.entries(appData.mindRecords);
+    if (entries.length===0) { container.innerHTML = '<div class="text-center text-gray-400 py-4">暂无观心记录</div>'; }
+    else {
+        entries.sort((a,b) => b[0].localeCompare(a[0]));
+        let html = '';
+        entries.forEach(([date, r]) => {
+            html += `<div class="bg-gradient-to-r from-sky-50 to-white p-3 rounded-xl border-l-4 border-dopamine-sky"><div class="font-bold text-gray-700">📅 ${date}</div><div class="text-sm mt-1"><span class="font-medium text-dopamine-yellow">✨ 骄傲一刻：</span>${escapeHtml(r.best||'未记录')}</div><div class="text-sm mt-1"><span class="font-medium text-dopamine-mint">🌱 进步空间：</span>${escapeHtml(r.improve||'未记录')}</div></div>`;
+        });
+        container.innerHTML = html;
+    }
+    document.getElementById("mindHistoryModal").classList.add("active");
+}
+
+// ==================== 全局 ====================
+function renderAll() {
+    updateFocusDisplay(); renderWorkCheckDisplay(); renderTasks(); renderFoods();
+    updateStatistics(); updateMoodUI(); renderCalendar(); loadMindForToday(); updatePersonSwitchUI(); renderInteractionPanel();
+    renderFocusTaskLink();
+}
+function displayDate() {
+    const d = new Date();
+    document.getElementById("currentDate").innerText = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}  ${['周日','周一','周二','周三','周四','周五','周六'][d.getDay()]}`;
+}
+function realtimeTick() { updateFocusDisplay(); renderWorkCheckDisplay(); updateStatistics(); }
+
+function bindEvents() {
+    document.querySelectorAll('.person-switch-btn').forEach(btn => btn.onclick = () => switchPerson(btn.getAttribute('data-person')));
+    document.querySelectorAll('.preset-tag-btn').forEach(btn => btn.onclick = () => {
+        const tagInput = document.getElementById('taskTagInput');
+        if (tagInput) tagInput.value = btn.getAttribute('data-tag') || '';
+        tagInput?.focus();
+    });
+    document.querySelectorAll('.task-filter-btn').forEach(btn => btn.onclick = () => {
+        activeTaskTagFilter = btn.getAttribute('data-filter-tag') || 'all';
+        updateTaskFilterUI();
+        renderTasks();
+    });
+    document.getElementById("startFocusBtn").onclick = startFocus;
+    document.getElementById("stopFocusBtn").onclick = stopFocus;
+    document.getElementById("chooseFocusTaskBtn").onclick = () => {
+        const firstAvailable = appData.tasks.find(task => task.status !== '已完成');
+        if (!firstAvailable) { alert('没有可专注的待办任务'); return; }
+        setActiveFocusTask(firstAvailable.id);
+    };
+    document.getElementById("clearFocusTaskBtn").onclick = clearActiveFocusTask;
+    document.getElementById("viewWorkCheckHistoryBtn").onclick = showWorkCheckHistory;
+    document.getElementById("prevMonthBtn").onclick = prevMonth;
+    document.getElementById("nextMonthBtn").onclick = nextMonth;
+    document.getElementById("saveMindBtn").onclick = saveMind;
+    document.getElementById("clearMindBtn").onclick = () => { document.getElementById("bestThing").value=""; document.getElementById("improveThing").value=""; };
+    document.getElementById("viewMindHistoryBtn").onclick = showMindHistory;
+    document.getElementById("viewMoodHistoryBtn").onclick = showMoodHistory;
+    document.getElementById("viewTaskHistoryBtn").onclick = showTaskHistory;
+    document.getElementById("viewFoodHistoryBtn").onclick = showFoodHistory;
+    document.getElementById("cheerPerson1Btn").onclick = () => sendCheer('person1');
+    document.getElementById("cheerPerson2Btn").onclick = () => sendCheer('person2');
+    document.getElementById("saveSharedGoalBtn").onclick = saveSharedGoal;
+    document.querySelectorAll('.close-modal-btn').forEach(btn => btn.onclick = () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')));
+    document.querySelectorAll('.modal-overlay').forEach(modal => modal.addEventListener('click', e => { if (e.target===modal) modal.classList.remove('active'); }));
+    document.getElementById("taskInput").addEventListener("keypress", e => { if (e.key==="Enter") addTask(); });
+    document.getElementById("foodInput").addEventListener("keypress", e => { if (e.key==="Enter") addFood(); });
+    document.querySelectorAll('.mood-emoji').forEach(el => el.addEventListener('click', e => setMood(e.currentTarget.getAttribute('data-mood'))));
+}
+
+function updateTaskFilterUI() {
+    document.querySelectorAll('.task-filter-btn').forEach(btn => {
+        const selected = btn.getAttribute('data-filter-tag') === activeTaskTagFilter;
+        btn.classList.toggle('bg-dopamine-orange', selected);
+        btn.classList.toggle('text-white', selected);
+        btn.classList.toggle('bg-gray-100', !selected);
+        btn.classList.toggle('text-gray-600', !selected);
+    });
+}
+
+function sendCheer(targetPerson) {
+    const cheerMessages = ['今天也很棒', '稳住，我们能赢', '你已经做得很好了', '继续冲，毕业在前方'];
+    const message = cheerMessages[Math.floor(Math.random() * cheerMessages.length)];
+    const shared = getSharedData();
+    const entry = { from: appData.activePerson, to: targetPerson, message, time: getNowDateTime() };
+    shared.lastCheer = `${getPersonName(appData.activePerson)} 对 ${getPersonName(targetPerson)} 说：${message}`;
+    shared.cheerLog.unshift(entry);
+    shared.cheerLog = shared.cheerLog.slice(0, 8);
+    getActiveProfile().cheers.unshift(entry);
+    saveData();
+    renderInteractionPanel();
+}
+
+function saveSharedGoal() {
+    const input = document.getElementById('sharedGoalInput');
+    const goal = input.value.trim();
+    if (!goal) return;
+    const shared = getSharedData();
+    shared.goal = goal;
+    shared.goalUpdatedAt = getNowDateTime();
+    saveData();
+    renderInteractionPanel();
+}
+
+function renderInteractionPanel() {
+    const shared = getSharedData();
+    const person1 = appData.profiles.person1;
+    const person2 = appData.profiles.person2;
+    const summary1 = document.getElementById('person1Summary');
+    const summary2 = document.getElementById('person2Summary');
+    const goalText = document.getElementById('sharedGoalText');
+    const activePersonName = document.getElementById('activePersonName');
+    const cheerText = shared.lastCheer || '还没有互相鼓励，先送出第一句加油吧';
+
+    if (activePersonName) activePersonName.innerText = getActivePersonName();
+    if (goalText) goalText.innerHTML = shared.goal ? `${escapeHtml(shared.goal)}<div class="text-xs text-gray-400 mt-1">${shared.goalUpdatedAt || ''}</div>` : '还没有共享目标';
+    const buildSummary = (profile, name) => {
+        const taskCount = profile.tasks.length;
+        const doneCount = profile.tasks.filter(t => t.status === '已完成').length;
+        const focusMinutes = profile.focusSessions.reduce((sum, item) => sum + (item.durationMinutes || 0), 0);
+        const workDays = Object.keys(profile.workRecords).filter(date => ['morning','afternoon','evening'].some(p => (profile.workRecords[date][p] || []).length > 0)).length;
+        const lastMood = (() => {
+            const moods = profile.moodHistory[getTodayStr()];
+            if (!moods) return '暂无';
+            const list = Array.isArray(moods) ? moods : [moods];
+            return list[list.length - 1]?.mood || '暂无';
+        })();
+        return `${name}：${taskCount} 个任务，已完成 ${doneCount} 个，专注 ${focusMinutes} 分钟，打卡 ${workDays} 天，今日心情 ${lastMood}`;
+    };
+    if (summary1) summary1.innerHTML = `${escapeHtml(buildSummary(person1, '水水'))}<div class="mt-2 text-xs text-dopamine-orange">最近鼓励：${escapeHtml(person1.cheers[0]?.message || '暂无')}</div>`;
+    if (summary2) summary2.innerHTML = `${escapeHtml(buildSummary(person2, '龙龙'))}<div class="mt-2 text-xs text-dopamine-purple">最近鼓励：${escapeHtml(person2.cheers[0]?.message || '暂无')}</div>`;
+    const hint = document.getElementById('moodHint');
+    if (hint) hint.title = cheerText;
+}
+
+function init() {
+    loadData(); bindEvents(); displayDate(); renderAll();
+    setInterval(realtimeTick, 1000);
+    setInterval(displayDate, 60000);
+}
+init();
+
+window.workCheck = workCheck;
+window.addTask = addTask;
+window.addFood = addFood;
+window.deleteFood = deleteFood;
+window.changeTaskStatus = changeTaskStatus;
+window.deleteTask = deleteTask;
+</script>
+</body>
+</html>
